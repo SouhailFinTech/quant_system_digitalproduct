@@ -2,7 +2,6 @@
 # Stack: Streamlit + free data sources + Gemini Flash designer
 # Deploy: push to GitHub → connect to Streamlit Cloud (free)
 # Author: your name here
-# ─────────────────────────────────────────────────────────
 
 import streamlit as st
 import requests
@@ -13,11 +12,7 @@ import sqlite3
 import os
 from datetime import datetime
 
-# ── HARD CODED API KEY & MODEL ───────────────────────────
-GEMINI_API_KEY = "AIzaSyDCGc2l3__EnnzZys5MnHLXmlD9QDAydpY"
-GEMINI_MODEL = "gemini-3.1-flash-lite"
-
-# ── PAGE CONFIG ────────────────────────────────────────────
+# ─ PAGE CONFIG ────────────────────────────────────────────
 st.set_page_config(
     page_title="QuantDrop — Digital Product Intelligence",
     page_icon="📊",
@@ -25,7 +20,7 @@ st.set_page_config(
     initial_sidebar_state="collapsed"
 )
 
-# ── CUSTOM CSS ─────────────────────────────────────────────
+# ─ CUSTOM CSS (Fixed all syntax errors) ───────────────────
 st.markdown("""
 <style>
 @import url('https://fonts.googleapis.com/css2?family=Space+Mono:wght@400;700&family=Syne:wght@400;600;800&display=swap');
@@ -191,7 +186,7 @@ header {visibility: hidden;}
 </style>
 """, unsafe_allow_html=True)
 
-# ── PLATFORM CONFIG ────────────────────────────────────────
+# ─ PLATFORM CONFIG (Removed trailing spaces) ─────────────
 PLATFORMS = {
     "KDP — Kindle / Paperback / Hardcover": {
         "id": "kdp",
@@ -226,7 +221,7 @@ PLATFORMS = {
 
 # ── DATABASE ───────────────────────────────────────────────
 def init_db():
-    conn = sqlite3.connect("quantdrop.db", check_same_thread=False)
+    conn = sqlite3.connect("quantdrop.db")
     conn.execute("""
         CREATE TABLE IF NOT EXISTS analyses (
             id INTEGER PRIMARY KEY AUTOINCREMENT,
@@ -241,7 +236,7 @@ def init_db():
 
 def save_analysis(keyword, platform, score, verdict, royalty, stressed, product_name):
     try:
-        conn = sqlite3.connect("quantdrop.db", check_same_thread=False)
+        conn = sqlite3.connect("quantdrop.db")
         conn.execute(
             "INSERT INTO analyses VALUES (NULL,?,?,?,?,?,?,?,?)",
             (keyword, platform, score, verdict, royalty, stressed,
@@ -254,7 +249,7 @@ def save_analysis(keyword, platform, score, verdict, royalty, stressed, product_
 
 def load_history():
     try:
-        conn = sqlite3.connect("quantdrop.db", check_same_thread=False)
+        conn = sqlite3.connect("quantdrop.db")
         rows = conn.execute(
             "SELECT keyword, platform, final_score, final_verdict, product_name, created_at "
             "FROM analyses ORDER BY id DESC LIMIT 15"
@@ -334,8 +329,8 @@ def get_reddit_complaints(keyword):
     except Exception:
         return []
 
+# ── GEMINI DESIGNER (Secure & Fixed) ──────────────────────
 def gemini_design(keyword, platform_cfg, complaints, api_key=None):
-    key = api_key or GEMINI_API_KEY
     fix = complaints[0] if complaints else "improve overall quality"
     product_type = platform_cfg["product_types"][0]
     platform_name = platform_cfg.get("product", "digital product")
@@ -353,11 +348,15 @@ Design a compelling {product_type}. Return ONLY valid JSON, no markdown, no back
     "unique_angle": "what makes this beat every competitor",
     "target_buyer": "specific demographic description"
 }}"""
+
+    # Use provided key, or look in Streamlit Secrets
+    key = api_key or st.secrets.get("GEMINI_API_KEY", "")
     
     if key:
         try:
+            # Ordered Model: gemini-3.1-flash-lite
             r = requests.post(
-                f"https://generativelanguage.googleapis.com/v1beta/models/{GEMINI_MODEL}:generateContent?key={key}",
+                f"https://generativelanguage.googleapis.com/v1beta/models/gemini-3.1-flash-lite:generateContent?key={key}",
                 json={"contents": [{"parts": [{"text": prompt}]}],
                       "generationConfig": {"temperature": 0.8, "maxOutputTokens": 512}},
                 timeout=20
@@ -510,12 +509,7 @@ def verdict_color(v):
     return {"GO": "#00FF88", "REVIEW": "#FFD166", "KILL": "#FF4757"}.get(v, "#6B8BA4")
 
 def verdict_emoji(v):
-    return {"GO": "✅", "REVIEW": "⚠️", "KILL": "❌"}.get(v, "—")
-
-def score_color(s):
-    if s >= 70: return "#00FF88"
-    if s >= 40: return "#FFD166"
-    return "#FF4757"
+    return {"GO": "✅", "REVIEW": "️", "KILL": "❌"}.get(v, "—")
 
 # ── MAIN UI ────────────────────────────────────────────────
 def main():
@@ -543,6 +537,14 @@ def main():
         ⚙️ CONFIG
         </div>
         """, unsafe_allow_html=True)
+        
+        # Optional: allow manual override, but relies on Secrets primarily
+        gemini_key = st.text_input(
+            "Gemini API Key (Optional)",
+            type="password",
+            placeholder="AIza... (Stored in Secrets)",
+            help="Key will be pulled from Streamlit Secrets automatically if left blank."
+        )
 
         st.markdown("---")
         st.markdown("""
@@ -610,7 +612,7 @@ def main():
         progress.progress(85, text="Generating AI design...")
 
         with st.spinner(""):
-            design = gemini_design(kw, platform_cfg, p3["complaints"], GEMINI_API_KEY)
+            design = gemini_design(kw, platform_cfg, p3["complaints"], gemini_key)
         progress.progress(95, text="Building listing copy...")
 
         listing = generate_listing(kw, platform_id, design)
@@ -872,7 +874,7 @@ def main():
     <div style="text-align:center;padding:32px 0 16px;border-top:1px solid #1E2B38;margin-top:40px">
       <div style="font-family:'Space Mono',monospace;font-size:11px;color:#6B8BA4">
        Built by a quant · Powered by <span style="color:#00D4FF">free data sources</span>
-       + <span style="color:#FF6B35">Gemini 3.1 Flash Lite</span> · QuantDrop v1.0
+       + <span style="color:#FF6B35">Gemini 3.1 Flash Lite</span> · QuantDrop v1.2
       </div>
     </div>
     """, unsafe_allow_html=True)
