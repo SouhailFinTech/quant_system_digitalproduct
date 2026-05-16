@@ -20,7 +20,7 @@ st.set_page_config(
     initial_sidebar_state="collapsed"
 )
 
-# ─ CUSTOM CSS (Fixed all syntax errors) ───────────────────
+# ── CUSTOM CSS ─────────────────────────────────────────────
 st.markdown("""
 <style>
 @import url('https://fonts.googleapis.com/css2?family=Space+Mono:wght@400;700&family=Syne:wght@400;600;800&display=swap');
@@ -31,12 +31,15 @@ html, body, [class*="css"] {
     color: #E8F4FF;
 }
 
+/* Hide Streamlit default elements */
 #MainMenu {visibility: hidden;}
 footer {visibility: hidden;}
 header {visibility: hidden;}
 
+/* Main background */
 .stApp { background-color: #080C10; }
 
+/* Metric cards */
 .metric-card {
     background: #0D1117;
     border: 1px solid #1E2B38;
@@ -64,6 +67,7 @@ header {visibility: hidden;}
     margin-top: 3px;
 }
 
+/* Phase card */
 .phase-card {
     background: #0D1117;
     border: 1px solid #1E2B38;
@@ -75,6 +79,7 @@ header {visibility: hidden;}
 .phase-card.review{ border-color: #FFD166; }
 .phase-card.kill  { border-color: #FF4757; }
 
+/* Verdict banner */
 .verdict-go {
     background: rgba(0,255,136,.08);
     border: 1.5px solid #00FF88;
@@ -97,6 +102,7 @@ header {visibility: hidden;}
     margin: 16px 0;
 }
 
+/* Design card */
 .design-card {
     background: #141B24;
     border: 1px solid #2A3D52;
@@ -105,6 +111,7 @@ header {visibility: hidden;}
     margin: 12px 0;
 }
 
+/* Tag */
 .tag {
     display: inline-block;
     font-family: 'Space Mono', monospace;
@@ -116,6 +123,7 @@ header {visibility: hidden;}
     margin: 2px;
 }
 
+/* Complaint */
 .complaint {
     border-left: 2px solid #FF6B35;
     padding: 6px 10px;
@@ -126,6 +134,7 @@ header {visibility: hidden;}
     margin-bottom: 6px;
 }
 
+/* Opportunity */
 .opportunity {
     background: rgba(0,255,136,.06);
     border: 1px solid rgba(0,255,136,.2);
@@ -137,6 +146,7 @@ header {visibility: hidden;}
     margin-top: 8px;
 }
 
+/* Section header */
 .section-header {
     font-family: 'Space Mono', monospace;
     font-size: 10px;
@@ -148,6 +158,7 @@ header {visibility: hidden;}
     margin: 16px 0 10px;
 }
 
+/* Swatch row */
 .swatch {
     display: inline-block;
     width: 24px;
@@ -157,6 +168,7 @@ header {visibility: hidden;}
     border: 2px solid #2A3D52;
 }
 
+/* Stapp input override */
 .stTextInput input {
     background: #0D1117 !important;
     border: 1px solid #2A3D52 !important;
@@ -186,7 +198,7 @@ header {visibility: hidden;}
 </style>
 """, unsafe_allow_html=True)
 
-# ─ PLATFORM CONFIG (Removed trailing spaces) ─────────────
+# ─ PLATFORM CONFIG ────────────────────────────────────────
 PLATFORMS = {
     "KDP — Kindle / Paperback / Hardcover": {
         "id": "kdp",
@@ -329,8 +341,8 @@ def get_reddit_complaints(keyword):
     except Exception:
         return []
 
-# ── GEMINI DESIGNER (Secure & Fixed) ──────────────────────
-def gemini_design(keyword, platform_cfg, complaints, api_key=None):
+# ── GEMINI DESIGNER (Fixed Model & Secrets) ───────────────
+def gemini_design(keyword, platform_cfg, complaints, api_key=""):
     fix = complaints[0] if complaints else "improve overall quality"
     product_type = platform_cfg["product_types"][0]
     platform_name = platform_cfg.get("product", "digital product")
@@ -349,7 +361,7 @@ Design a compelling {product_type}. Return ONLY valid JSON, no markdown, no back
     "target_buyer": "specific demographic description"
 }}"""
 
-    # Use provided key, or look in Streamlit Secrets
+    # Priority: 1. Passed Arg -> 2. Streamlit Secrets
     key = api_key or st.secrets.get("GEMINI_API_KEY", "")
     
     if key:
@@ -509,7 +521,7 @@ def verdict_color(v):
     return {"GO": "#00FF88", "REVIEW": "#FFD166", "KILL": "#FF4757"}.get(v, "#6B8BA4")
 
 def verdict_emoji(v):
-    return {"GO": "✅", "REVIEW": "️", "KILL": "❌"}.get(v, "—")
+    return {"GO": "✅", "REVIEW": "⚠️", "KILL": "❌"}.get(v, "—")
 
 # ── MAIN UI ────────────────────────────────────────────────
 def main():
@@ -534,15 +546,14 @@ def main():
         st.markdown("""
         <div style="font-family:'Space Mono',monospace;font-size:14px;
                    color:#00D4FF;font-weight:700;margin-bottom:16px">
-        ⚙️ CONFIG
+        ️ CONFIG
         </div>
         """, unsafe_allow_html=True)
-        
-        # Optional: allow manual override, but relies on Secrets primarily
+
         gemini_key = st.text_input(
-            "Gemini API Key (Optional)",
+            "Gemini API Key",
             type="password",
-            placeholder="AIza... (Stored in Secrets)",
+            placeholder="AIza... (optional)",
             help="Key will be pulled from Streamlit Secrets automatically if left blank."
         )
 
@@ -628,8 +639,17 @@ def main():
         save_analysis(kw, platform_name, final_score, final_verdict,
                       p4["royalty"], p4["stressed_royalty"], design["product_name"])
 
+        # --- FIXED VERDICT BANNER ---
+        # Calculated outside f-string to prevent SyntaxError
+        verdict_msg = {
+            "GO": "Validated — create and publish now",
+            "REVIEW": "Promising — refine keyword before creating",
+            "KILL": "Low signal — find a different niche"
+        }.get(final_verdict, "—")
+
         vc = verdict_color(final_verdict)
         css_class = f"verdict-{final_verdict.lower()}"
+        
         st.markdown(f"""
         <div class="{css_class}">
           <div style="display:flex;align-items:center;justify-content:space-between">
@@ -639,9 +659,7 @@ def main():
                {verdict_emoji(final_verdict)} {final_verdict}
               </div>
               <div style="font-size:13px;color:#6B8BA4;margin-top:4px">
-               {{"GO": "Validated — create and publish now",
-                  "REVIEW": "Promising — refine keyword before creating",
-                  "KILL": "Low signal — find a different niche"}[final_verdict]}
+               {verdict_msg}
                · Platform: {platform_cfg['id'].upper()}
               </div>
             </div>
@@ -874,7 +892,7 @@ def main():
     <div style="text-align:center;padding:32px 0 16px;border-top:1px solid #1E2B38;margin-top:40px">
       <div style="font-family:'Space Mono',monospace;font-size:11px;color:#6B8BA4">
        Built by a quant · Powered by <span style="color:#00D4FF">free data sources</span>
-       + <span style="color:#FF6B35">Gemini 3.1 Flash Lite</span> · QuantDrop v1.2
+       + <span style="color:#FF6B35">Gemini 3.1 Flash Lite</span> · QuantDrop v1.3
       </div>
     </div>
     """, unsafe_allow_html=True)
