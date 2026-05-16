@@ -12,7 +12,7 @@ import sqlite3
 import os
 from datetime import datetime
 
-# ─ PAGE CONFIG ────────────────────────────────────────────
+# ── PAGE CONFIG ────────────────────────────────────────────
 st.set_page_config(
     page_title="QuantDrop — Digital Product Intelligence",
     page_icon="📊",
@@ -20,7 +20,7 @@ st.set_page_config(
     initial_sidebar_state="collapsed"
 )
 
-# ── CUSTOM CSS ─────────────────────────────────────────────
+# ── CUSTOM CSS (Cleaned & Fixed) ───────────────────────────
 st.markdown("""
 <style>
 @import url('https://fonts.googleapis.com/css2?family=Space+Mono:wght@400;700&family=Syne:wght@400;600;800&display=swap');
@@ -31,15 +31,12 @@ html, body, [class*="css"] {
     color: #E8F4FF;
 }
 
-/* Hide Streamlit default elements */
 #MainMenu {visibility: hidden;}
 footer {visibility: hidden;}
 header {visibility: hidden;}
 
-/* Main background */
 .stApp { background-color: #080C10; }
 
-/* Metric cards */
 .metric-card {
     background: #0D1117;
     border: 1px solid #1E2B38;
@@ -67,7 +64,6 @@ header {visibility: hidden;}
     margin-top: 3px;
 }
 
-/* Phase card */
 .phase-card {
     background: #0D1117;
     border: 1px solid #1E2B38;
@@ -79,7 +75,6 @@ header {visibility: hidden;}
 .phase-card.review{ border-color: #FFD166; }
 .phase-card.kill  { border-color: #FF4757; }
 
-/* Verdict banner */
 .verdict-go {
     background: rgba(0,255,136,.08);
     border: 1.5px solid #00FF88;
@@ -102,7 +97,6 @@ header {visibility: hidden;}
     margin: 16px 0;
 }
 
-/* Design card */
 .design-card {
     background: #141B24;
     border: 1px solid #2A3D52;
@@ -111,7 +105,6 @@ header {visibility: hidden;}
     margin: 12px 0;
 }
 
-/* Tag */
 .tag {
     display: inline-block;
     font-family: 'Space Mono', monospace;
@@ -123,7 +116,6 @@ header {visibility: hidden;}
     margin: 2px;
 }
 
-/* Complaint */
 .complaint {
     border-left: 2px solid #FF6B35;
     padding: 6px 10px;
@@ -134,7 +126,6 @@ header {visibility: hidden;}
     margin-bottom: 6px;
 }
 
-/* Opportunity */
 .opportunity {
     background: rgba(0,255,136,.06);
     border: 1px solid rgba(0,255,136,.2);
@@ -146,7 +137,6 @@ header {visibility: hidden;}
     margin-top: 8px;
 }
 
-/* Section header */
 .section-header {
     font-family: 'Space Mono', monospace;
     font-size: 10px;
@@ -158,7 +148,6 @@ header {visibility: hidden;}
     margin: 16px 0 10px;
 }
 
-/* Swatch row */
 .swatch {
     display: inline-block;
     width: 24px;
@@ -168,7 +157,6 @@ header {visibility: hidden;}
     border: 2px solid #2A3D52;
 }
 
-/* Stapp input override */
 .stTextInput input {
     background: #0D1117 !important;
     border: 1px solid #2A3D52 !important;
@@ -198,7 +186,7 @@ header {visibility: hidden;}
 </style>
 """, unsafe_allow_html=True)
 
-# ─ PLATFORM CONFIG ────────────────────────────────────────
+# ── PLATFORM CONFIG (Trailing spaces removed) ──────────────
 PLATFORMS = {
     "KDP — Kindle / Paperback / Hardcover": {
         "id": "kdp",
@@ -341,7 +329,7 @@ def get_reddit_complaints(keyword):
     except Exception:
         return []
 
-# ── GEMINI DESIGNER (Fixed Model & Secrets) ───────────────
+# ── GEMINI DESIGNER (Model: 3.1 Flash Lite + Secrets Fallback) ──
 def gemini_design(keyword, platform_cfg, complaints, api_key=""):
     fix = complaints[0] if complaints else "improve overall quality"
     product_type = platform_cfg["product_types"][0]
@@ -366,7 +354,6 @@ Design a compelling {product_type}. Return ONLY valid JSON, no markdown, no back
     
     if key:
         try:
-            # Ordered Model: gemini-3.1-flash-lite
             r = requests.post(
                 f"https://generativelanguage.googleapis.com/v1beta/models/gemini-3.1-flash-lite:generateContent?key={key}",
                 json={"contents": [{"parts": [{"text": prompt}]}],
@@ -380,8 +367,6 @@ Design a compelling {product_type}. Return ONLY valid JSON, no markdown, no back
             st.warning(f"Gemini API: {e} — using fallback design")
 
     # Smart fallback — no API key needed
-    words = keyword.split()
-    name_word = words[0].capitalize() if words else keyword.capitalize()
     palettes = [
         ["#1A1A2E", "#16213E", "#E94560"],
         ["#2D3436", "#636E72", "#FDCB6E"],
@@ -404,39 +389,45 @@ Design a compelling {product_type}. Return ONLY valid JSON, no markdown, no back
         "target_buyer": "Adults 25–45 committed to daily self-improvement",
     }
 
+# ── LISTING GENERATOR (Fixed repetitive tags) ──────────────
 def generate_listing(keyword, platform_id, design):
     name = design.get("product_name", keyword)
     tagline = design.get("tagline", "")
     features = design.get("key_features", [])
     buyer = design.get("target_buyer", "Adults")
+    
+    # Extract core nouns for cleaner SEO tags
+    core_words = [w for w in keyword.lower().split() if w not in {"for", "the", "and", "2025", "2026", "with"}]
+    base_kw = " ".join(core_words[:3])  # e.g., "gratitude journal women"
 
     if platform_id == "kdp":
         title = f"{name}: {tagline}"[:200]
         bullets = [f"✓ {f}" for f in features]
         description = (
             f"Designed for {buyer.lower()}, {name} solves the #1 complaint "
-            f"buyers have with existing {keyword} products. {tagline}. "
+            f"buyers have with existing {base_kw} products. {tagline}. "
             f"Undated format — start any day of the year."
         )
-        keywords = [keyword, f"best {keyword}", f"{keyword} 2026",
-                    f"daily {keyword}", f"{keyword} gift", f"{keyword} for women",
-                    f"{keyword} for men", f"{keyword} notebook"]
-        return {"title": title, "bullets": bullets,
-                "description": description, "keywords": keywords}
+        keywords = [
+            base_kw, f"best {base_kw}", f"daily {base_kw}", 
+            f"{base_kw} gift", f"{base_kw} for women", f"{base_kw} for men",
+            f"{base_kw} notebook", "undated journal", "mindfulness log"
+        ]
+        return {"title": title, "bullets": bullets, "description": description, "keywords": keywords}
 
     elif platform_id == "mba":
         title = f"{name} | {tagline}"[:60]
         bullets = features
-        tags = [keyword.replace(" ", ""), "funny", "gift", "novelty",
+        tags = [base_kw.replace(" ", ""), "funny", "gift", "novelty",
                 "quote", "sarcastic", buyer.split()[0].lower(), "tee"]
         return {"title": title, "bullets": bullets, "tags": tags}
 
     else:  # etsy
-        title = f"{name} | {tagline} | Digital Download | {keyword.title()} Printable"[:140]
-        tags = [keyword, f"{keyword} printable", "digital download",
+        title = f"{name} | {tagline} | Digital Download | {base_kw.title()} Printable"[:140]
+        tags = [base_kw, f"{base_kw} printable", "digital download",
                 "instant download", "pdf planner", "self care",
                 "mindfulness", "printable planner", "letter size",
-                "a4 size", "gift idea", "wall art", keyword.split()[0]]
+                "a4 size", "gift idea", "wall art", core_words[0]]
         return {"title": title, "tags": tags[:13],
                 "description": f"Instant digital download. {tagline}. Print at home."}
 
@@ -468,9 +459,10 @@ def run_phase1(keyword, platform_cfg):
     }
 
 def run_phase2(keyword):
+    # OPTION 1: Long-tail friendly baseline (changed 0->9)
     sugs = get_amazon_suggestions(keyword + " best seller", "aps")
     count = len(sugs)
-    score = 22 if count >= 8 else 16 if count >= 5 else 9 if count >= 3 else 4
+    score = 22 if count >= 8 else 16 if count >= 5 else 9 if count >= 1 else 9
     verdict = "GO" if score >= 16 else "REVIEW" if score >= 9 else "KILL"
     return {"score": score, "verdict": verdict, "proxy_count": count}
 
@@ -516,7 +508,7 @@ def run_phase4(platform_key, platform_cfg):
         "monthly_sales_500": round(500 / royalty) if royalty > 0 else 999,
     }
 
-# ── VERDICT HELPERS ────────────────────────────────────────
+# ── VERDICT HELPERS ───────────────────────────────────────
 def verdict_color(v):
     return {"GO": "#00FF88", "REVIEW": "#FFD166", "KILL": "#FF4757"}.get(v, "#6B8BA4")
 
@@ -529,7 +521,7 @@ def main():
     <div style="text-align:center;padding:32px 0 16px">
       <div style="font-family:'Space Mono',monospace;font-size:13px;color:#00D4FF;
       letter-spacing:.15em;text-transform:uppercase;margin-bottom:10px">
-      ⬛ Quant-Driven · AI-Designed · $0 Capital
+       Quant-Driven · AI-Designed · $0 Capital
       </div>
       <h1 style="font-family:'Syne',sans-serif;font-size:48px;font-weight:800;
       background:linear-gradient(135deg,#E8F4FF,#00D4FF,#FF6B35);
@@ -546,14 +538,14 @@ def main():
         st.markdown("""
         <div style="font-family:'Space Mono',monospace;font-size:14px;
                    color:#00D4FF;font-weight:700;margin-bottom:16px">
-        ️ CONFIG
+        ⚙️ CONFIG
         </div>
         """, unsafe_allow_html=True)
 
         gemini_key = st.text_input(
-            "Gemini API Key",
+            "Gemini API Key (Optional)",
             type="password",
-            placeholder="AIza... (optional)",
+            placeholder="AIza... (Stored in Secrets)",
             help="Key will be pulled from Streamlit Secrets automatically if left blank."
         )
 
@@ -639,8 +631,7 @@ def main():
         save_analysis(kw, platform_name, final_score, final_verdict,
                       p4["royalty"], p4["stressed_royalty"], design["product_name"])
 
-        # --- FIXED VERDICT BANNER ---
-        # Calculated outside f-string to prevent SyntaxError
+        # --- FIXED VERDICT BANNER (Safe dict lookup) ---
         verdict_msg = {
             "GO": "Validated — create and publish now",
             "REVIEW": "Promising — refine keyword before creating",
@@ -892,7 +883,7 @@ def main():
     <div style="text-align:center;padding:32px 0 16px;border-top:1px solid #1E2B38;margin-top:40px">
       <div style="font-family:'Space Mono',monospace;font-size:11px;color:#6B8BA4">
        Built by a quant · Powered by <span style="color:#00D4FF">free data sources</span>
-       + <span style="color:#FF6B35">Gemini 3.1 Flash Lite</span> · QuantDrop v1.3
+       + <span style="color:#FF6B35">Gemini 3.1 Flash Lite</span> · QuantDrop v1.4
       </div>
     </div>
     """, unsafe_allow_html=True)
