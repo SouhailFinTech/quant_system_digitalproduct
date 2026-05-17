@@ -322,14 +322,24 @@ def score_demand(google_sugs, amazon_data, trends):
             "google_count": g_count, "amazon_count": a_count, "avg_reviews": round(avg_rev)}
 
 def score_trend(trends):
-    if trends.get("status") != "ok": return {"score": 10, "max": 20, "verdict": "REVIEW", "note": "Trend data unavailable"}
+    # ✅ FIX: Ensure ALL keys are returned even when data is missing/error
+    # The UI expects 'slope', 'current', and 'avg' regardless of status.
+    if trends.get("status") != "ok":
+        return {
+            "score": 10, "max": 20, "verdict": "REVIEW", 
+            "note": "Trend data unavailable",
+            "slope": 0.0, "current": 0, "avg": 0.0  # <--- ADDED THESE MISSING KEYS
+        }
+    
     slope, current, avg = trends["slope"], trends["current"], trends["avg"]
     slope_s = 10 if slope >= 1.0 else 8 if slope >= 0.3 else 6 if slope >= 0.0 else 3 if slope >= -0.5 else 0
     now_s = 10 if avg > 0 and current/avg >= 1.3 else 7 if avg > 0 and current/avg >= 1.0 else 4 if avg > 0 and current/avg >= 0.7 else 1 if avg > 0 else 5
     score = min(20, slope_s + now_s)
-    return {"score": score, "max": 20, "verdict": "GO" if score >= 14 else "REVIEW" if score >= 8 else "KILL",
-            "slope": slope, "current": current, "avg": avg, "note": "ok"}
-
+    return {
+        "score": score, "max": 20,
+        "verdict": "GO" if score >= 14 else "REVIEW" if score >= 8 else "KILL",
+        "slope": slope, "current": current, "avg": avg, "note": "ok"
+    }
 def score_sentiment(complaints):
     score = 10 if len(complaints) >= 3 else 8 if len(complaints) == 2 else 5 if len(complaints) == 1 else 3
     return {"score": score, "max": 10, "verdict": "GO" if score >= 7 else "REVIEW",
