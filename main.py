@@ -432,7 +432,7 @@ def main():
         progress.empty()
         import pandas as pd
         df = pd.DataFrame(batch_out).sort_values("score", ascending=False)
-        def color_verdict(v): return f"color: {{'GO':'#00FF88','REVIEW':'#FFD166','KILL':'#FF4757'}.get(v,'#6B8BA4')}"
+        def color_verdict(v): return f"color: {({'GO':'#00FF88','REVIEW':'#FFD166','KILL':'#FF4757'}).get(v,'#6B8BA4')}"
         st.dataframe(df.style.applymap(lambda v: color_verdict(v), subset=["verdict"]), use_container_width=True)
         st.download_button("📥 Download CSV", df.to_csv(index=False), f"quantdrop_batch_{datetime.now().strftime('%Y%m%d_%H%M')}.csv", "text/csv")
 
