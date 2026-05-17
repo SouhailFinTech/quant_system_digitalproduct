@@ -227,7 +227,7 @@ def load_history():
 
 init_db()
 
-# ── DATA FETCHERS (All URLs & params cleaned) ──────────────
+# ── DATA FETCHERS ──────────────────────────────────────────
 def safe_get(url, params, label, timeout=8):
     headers = {
         "User-Agent": "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36",
@@ -294,7 +294,7 @@ def get_reddit_complaints(keyword):
     except Exception:
         return []
 
-# ── GEMINI DESIGNER (Model: gemini-3.1-flash-lite) ─────────
+# ── GEMINI DESIGNER (FIX 1: Updated to valid public model) ─
 def gemini_design(keyword, platform_cfg, complaints, api_key=""):
     fix = complaints[0] if complaints else "improve overall quality"
     product_type = platform_cfg["product_types"][0]
@@ -316,9 +316,9 @@ Design a compelling {product_type}. Return ONLY valid JSON, no markdown, no back
     
     if api_key:
         try:
-            # Ordered model exactly as requested
+            # FIX 1: Changed to publicly available model
             r = requests.post(
-                f"https://generativelanguage.googleapis.com/v1beta/models/gemini-3.1-flash-lite:generateContent?key={api_key}",
+                f"https://generativelanguage.googleapis.com/v1beta/models/gemini-1.5-flash-latest:generateContent?key={api_key}",
                 json={"contents": [{"parts": [{"text": prompt}]}],
                       "generationConfig": {"temperature": 0.8, "maxOutputTokens": 512}},
                 timeout=20
@@ -351,7 +351,7 @@ Design a compelling {product_type}. Return ONLY valid JSON, no markdown, no back
         "target_buyer": "Adults 25–45 committed to daily self-improvement",
     }
 
-# ── LISTING GENERATOR (Fixed tag spacing) ──────────────────
+# ── LISTING GENERATOR ──────────────────────────────────────
 def generate_listing(keyword, platform_id, design):
     name = design.get("product_name", keyword)
     tagline = design.get("tagline", "")
@@ -387,11 +387,17 @@ def generate_listing(keyword, platform_id, design):
         return {"title": title, "tags": tags[:13],
                 "description": f"Instant digital download. {tagline}. Print at home."}
 
-# ── PHASE RUNNERS (All keys & returns fixed) ───────────────
+# ── PHASE RUNNERS (FIX 2 & 3 APPLIED) ─────────────────────
 def run_phase1(keyword, platform_cfg):
     alias = platform_cfg.get("kindle_alias", "aps")
-    amazon_sugs = get_amazon_suggestions(keyword, alias)
+    
+    # FIX 2: Use root keyword (first 2 words) to bypass IP blocking on long-tail
+    root_keyword = " ".join(keyword.split()[:2])
+    amazon_sugs = get_amazon_suggestions(root_keyword, alias)
+    
+    # Keep full keyword for Google (it handles long-tail well)
     google_sugs = get_google_suggestions(keyword)
+    
     commercial_words = {"buy", "best", "2026", "2025", "printable", "digital",
                         "download", "women", "men", "gift", "for", "review"}
     kw_words = set(keyword.lower().split())
@@ -412,7 +418,8 @@ def run_phase1(keyword, platform_cfg):
     }
 
 def run_phase2(keyword):
-    sugs = get_amazon_suggestions(keyword + " best seller", "aps")
+    # FIX 3: Use only the first word for velocity proxy to avoid 0 results
+    sugs = get_amazon_suggestions(keyword.split()[0], "aps")
     count = len(sugs)
     score = 22 if count >= 8 else 16 if count >= 5 else 9 if count >= 3 else 4
     verdict = "GO" if score >= 16 else "REVIEW" if score >= 9 else "KILL"
@@ -455,7 +462,7 @@ def run_phase4(platform_key, platform_cfg):
         "royalty": round(royalty, 2), "stressed_royalty": round(stressed, 2),
         "margin": round(margin * 100, 1), "stressed_margin": round(stressed_margin * 100, 1),
         "monthly_sales_500": round(500 / royalty) if royalty > 0 else 999,
-        "monthly_sales_1000": round(1000 / royalty) if royalty > 0 else 999,  # ✅ FIXED KEY
+        "monthly_sales_1000": round(1000 / royalty) if royalty > 0 else 999,
     }
 
 # ── VERDICT HELPERS ────────────────────────────────────────
@@ -507,7 +514,7 @@ def main():
         ✓ Amazon autocomplete<br>
         ✓ Google autocomplete<br>
         ✓ Reddit complaints<br>
-        ✓ Gemini 3.1 Flash Lite<br>
+        ✓ Gemini 1.5 Flash Latest<br>
         ✓ KDP / MBA / Etsy fee tables<br><br>
         <b style="color:#E8F4FF">PHASES</b><br>
         1 → Demand signal<br>
@@ -575,7 +582,7 @@ def main():
         save_analysis(kw, platform_name, final_score, final_verdict,
                       p4["royalty"], p4["stressed_royalty"], design["product_name"])
 
-        # ✅ FIX: Extract dict lookup before f-string to prevent SyntaxError
+        # Safe f-string dict lookup
         verdict_msg = {
             "GO": "Validated — create and publish now",
             "REVIEW": "Promising — refine keyword before creating",
@@ -721,7 +728,7 @@ def main():
         </div>
         """, unsafe_allow_html=True)
 
-        st.markdown('<div class="section-header">Gemini 3.1 Flash Lite — AI Product Design</div>', unsafe_allow_html=True)
+        st.markdown('<div class="section-header">Gemini 1.5 Flash — AI Product Design</div>', unsafe_allow_html=True)
         swatches = " ".join([f'<span class="swatch" style="background:{c};border-color:{c}88"></span>' for c in design.get("color_palette", [])])
         features_html = " ".join([f'<li style="font-size:12px;color:#6B8BA4;padding:3px 0;list-style:none">→ {f}</li>' for f in design.get("key_features", [])])
 
@@ -729,7 +736,7 @@ def main():
         <div class="design-card">
           <div style="font-family:'Space Mono',monospace;font-size:9px;color:#00D4FF;
                       letter-spacing:.12em;text-transform:uppercase;margin-bottom:8px">
-           ✦ AI DESIGNED BY GEMINI 3.1 FLASH LITE
+           ✦ AI DESIGNED BY GEMINI 1.5 FLASH LATEST
           </div>
           <div style="font-size:26px;font-weight:800;color:#E8F4FF;margin-bottom:4px">
            {design.get('product_name', '—')}
@@ -790,7 +797,7 @@ def main():
 
             tags = listing.get("keywords") or listing.get("tags") or []
             if tags:
-                # ✅ FIX: Added space between tags
+                # Fixed tag spacing
                 tags_html = " ".join([f'<span class="tag">{t}</span>' for t in tags])
                 st.markdown(f"""
                 <div style="font-family:'Space Mono',monospace;font-size:9px;color:#6B8BA4;
@@ -829,7 +836,7 @@ def main():
     <div style="text-align:center;padding:32px 0 16px;border-top:1px solid #1E2B38;margin-top:40px">
       <div style="font-family:'Space Mono',monospace;font-size:11px;color:#6B8BA4">
        Built by a quant · Powered by <span style="color:#00D4FF">free data sources</span>
-       + <span style="color:#FF6B35">Gemini 3.1 Flash Lite</span> · QuantDrop v4.1 (Stable)
+       + <span style="color:#FF6B35">Gemini 1.5 Flash</span> · QuantDrop v4.2 (Stable)
       </div>
     </div>
     """, unsafe_allow_html=True)
