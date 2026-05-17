@@ -156,7 +156,7 @@ Design a compelling {product_type}. Return ONLY valid JSON, no markdown, no back
     try:
         # Using stable gemini-1.5-flash-latest
         r = requests.post(
-            f"https://generativelanguage.googleapis.com/v1beta/models/gemini-1.5-flash-latest:generateContent?key={key}",
+            f"https://generativelanguage.googleapis.com/v1beta/models/gemini-3.1-flash-lite:generateContent?key={key}",
             json={"contents": [{"parts": [{"text": prompt}]}], "generationConfig": {"temperature": 0.8, "maxOutputTokens": 512}},
             timeout=20
         )
