@@ -287,16 +287,27 @@ def score_economics(platform_cfg):
         price = platform_cfg["price"]
         royalty = platform_cfg["royalty_flat"]
         stressed = platform_cfg["royalty_flat"] * 0.72
-    else:
+    else:  # etsy
         price = platform_cfg["price"]
         royalty = price * platform_cfg["royalty_pct"] - platform_cfg["fees"]
         stressed = price * 0.72 * platform_cfg["royalty_pct"] - platform_cfg["fees"]
+        
     margin = royalty / price
     s_margin = stressed / (price * 0.80)
+    
     score = 40 if s_margin >= 0.35 else 35 if s_margin >= 0.25 else 28 if s_margin >= 0.20 else 18 if s_margin >= 0.12 else 6
-    return {"score": score, "max": 40, "verdict": "GO" if score >= 28 else "REVIEW" if score >= 18 else "KILL",
-            "royalty": round(royalty,2), "stressed_royalty": round(stressed,2), "margin": round(margin*100,1),
-            "stressed_margin": round(s_margin*100,1), "monthly_for_500": round(500/royalty) if royalty>0 else 999}
+    
+    return {
+        "score": score,
+        "max": 40,
+        "verdict": "GO" if score >= 28 else "REVIEW" if score >= 18 else "KILL",
+        "royalty": round(royalty, 2),
+        "stressed_royalty": round(stressed, 2),
+        "margin": round(margin * 100, 1),
+        "stressed_margin": round(s_margin * 100, 1),
+        "monthly_for_500": round(500 / royalty) if royalty > 0 else 999,
+        "monthly_for_1000": round(1000 / royalty) if royalty > 0 else 999,  # ✅ ADDED
+    }
 
 def score_demand(google_sugs, amazon_data, trends):
     g_count = len(google_sugs)
