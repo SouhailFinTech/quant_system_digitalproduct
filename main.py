@@ -138,11 +138,11 @@ def get_reddit_complaints(keyword):
 
 # ── GEMINI DESIGNER (FIX 2 & 3: Secrets fallback + debug UI) ─
 def gemini_design(keyword, platform_cfg, complaints, api_key=""):
-    # FIX 3: Priority chain → Sidebar key → Streamlit Secrets → Fallback
+    # Priority chain: Sidebar -> Secrets -> Fallback
     key = api_key or st.secrets.get("GEMINI_API_KEY", "")
     if not key:
         return _fallback_design(keyword, platform_cfg, complaints)
-        
+
     fix = complaints[0] if complaints else "improve overall quality"
     product_type = platform_cfg["product_types"][0]
     platform_name = platform_cfg.get("product", "digital product")
@@ -152,23 +152,37 @@ Keyword niche: "{keyword}"
 Main buyer complaint to fix: "{fix}"
 Design a compelling {product_type}. Return ONLY valid JSON, no markdown, no backticks:
 {{"product_name":"creative memorable name","tagline":"one powerful line","color_palette":["#hex1","#hex2","#hex3"],"cover_style":"specific visual description","key_features":["feature 1","feature 2","feature 3"],"unique_angle":"why this beats competitors","target_buyer":"specific demographic"}}"""
-    
+
     try:
-        # Using gemini-1.5-flash-latest (publicly available & stable)
+        # Using stable gemini-1.5-flash-latest
         r = requests.post(
             f"https://generativelanguage.googleapis.com/v1beta/models/gemini-1.5-flash-latest:generateContent?key={key}",
             json={"contents": [{"parts": [{"text": prompt}]}], "generationConfig": {"temperature": 0.8, "maxOutputTokens": 512}},
             timeout=20
         )
-        text = r.json()["candidates"][0]["content"]["parts"][0]["text"].strip().replace("```json", "").replace("```", "").strip()
+
+        # --- NEW: Debugging & Safe Parsing ---
+        if r.status_code != 200:
+            st.error(f"Gemini API Error ({r.status_code}): {r.text[:150]}")
+            return _fallback_design(keyword, platform_cfg, complaints)
+
+        response_data = r.json()
+        if "candidates" not in response_data:
+            st.error(f"Gemini Response Structure Error: {response_data}")
+            return _fallback_design(keyword, platform_cfg, complaints)
+
+        text = response_data["candidates"][0]["content"]["parts"][0]["text"]
+        # Clean up JSON
+        text = text.strip().replace("```json", "").replace("```", "").strip()
         return json.loads(text)
+
     except Exception as e:
-        st.warning(f"Gemini API Error: {e} — using fallback design")
+        st.warning(f"Gemini Exception: {e}")
         return _fallback_design(keyword, platform_cfg, complaints)
 
 def _fallback_design(keyword, platform_cfg, complaints):
     fix = complaints[0] if complaints else "improve overall quality"
-    palettes = [["#1A1A2E","#16213E","#E94560"],["#2D3436","#636E72","#FDCB6E"],["#0F3460","#533483","#E94560"],["#2C3E50","#27AE60","#F39C12"]]
+    palettes = [["#1A1A2E","#16213E","#E94560"],["#2D3436","#636E72","#FDCB6E"],["#0F3460","#533483","#E94560"]]
     return {
         "product_name": f"The {keyword.title()} Blueprint",
         "tagline": f"The only {keyword} built from real buyer feedback",
